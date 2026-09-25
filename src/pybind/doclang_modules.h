@@ -68,7 +68,7 @@ PYBIND11_MODULE(andromeda_doclang, m) {
     .def("annotation_paths", &andromeda_py::DocLangXDocument::annotation_paths)
     .def("document_reference", &andromeda_py::DocLangXDocument::document_reference)
     .def("references", &andromeda_py::DocLangXDocument::references)
-    .def("document_summary", &andromeda_py::DocLangXDocument::document_summary)
+    .def("summary", &andromeda_py::DocLangXDocument::summary)
     .def("toc", &andromeda_py::DocLangXDocument::toc)
     .def("concepts", &andromeda_py::DocLangXDocument::concepts)
     .def("set_document_reference", &andromeda_py::DocLangXDocument::set_document_reference,
@@ -87,7 +87,7 @@ PYBIND11_MODULE(andromeda_doclang, m) {
     .def("clear_toc", &andromeda_py::DocLangXDocument::clear_toc)
     .def("clear_concepts", &andromeda_py::DocLangXDocument::clear_concepts)
 
-    .def("summary", &andromeda_py::DocLangXDocument::summary)
+    .def("overview", &andromeda_py::DocLangXDocument::overview)
     .def("properties", &andromeda_py::DocLangXDocument::properties)
     .def("entities", &andromeda_py::DocLangXDocument::entities)
     .def("instances", &andromeda_py::DocLangXDocument::instances)

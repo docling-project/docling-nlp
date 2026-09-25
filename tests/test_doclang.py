@@ -70,7 +70,7 @@ def test_doclangx_document_read_query_write(tmp_path):
     assert doc.has_archive()
     assert doc.has_annotations()
 
-    summary = doc.summary()
+    summary = doc.overview()
     assert summary["properties"] == 1
     assert summary["instances"] == 1
     assert summary["relations"] == 1
@@ -127,7 +127,7 @@ def test_doclangx_document_read_query_write(tmp_path):
     assert len(doc.query_instances(type="term", name="missing")) == 0
     assert len(doc.query_relations(name="contains", name_contains="material")) == 1
     assert len(doc.query_relations(name="contains", min_conf=0.9)) == 0
-    assert doc.summary()["edges"] == 0
+    assert doc.overview()["edges"] == 0
 
     doc.materialize_edges()
     edges = doc.edges()
@@ -141,16 +141,16 @@ def test_doclangx_document_read_query_write(tmp_path):
         len(doc.query_edges(name="to-instances", hash_i=DocLangXDocument.hash("FeSe")))
         == 1
     )
-    assert doc.summary()["edges"] == 3
+    assert doc.overview()["edges"] == 3
 
     assert doc.write(str(output_path))
 
     restored = DocLangXDocument()
     assert restored.read(str(output_path))
-    assert restored.summary()["instances"] == 1
-    assert restored.summary()["entities"] == 1
+    assert restored.overview()["instances"] == 1
+    assert restored.overview()["entities"] == 1
     assert len(restored.query_instances(name="FeSe")) == 1
-    assert restored.summary()["edges"] == 3
+    assert restored.overview()["edges"] == 3
     assert len(restored.query_edges(name="to-entities")) == 1
 
 
@@ -191,7 +191,7 @@ def test_doclangx_document_apply_nlp_empty_model_expr(tmp_path):
     doc = DocLangXDocument()
     assert doc.read_xml('<doclang version="0.7"><text>Body text</text></doclang>')
     assert doc.apply_nlp("", progress_every=0)
-    assert doc.summary()["instances"] == 0
+    assert doc.overview()["instances"] == 0
     assert doc.write(str(output_path))
 
     restored = DocLangXDocument()
@@ -218,11 +218,11 @@ def test_doclangx_document_document_level_annotations_round_trip(tmp_path):
         "<abbreviation>FeSe</abbreviation><description>Material</description>"
         "</concept></concepts></doclang>"
     )
-    assert doc.summary()["has_document_reference"]
-    assert doc.summary()["has_references"]
-    assert doc.summary()["has_summary"]
-    assert doc.summary()["has_toc"]
-    assert doc.summary()["has_concepts"]
+    assert doc.overview()["has_document_reference"]
+    assert doc.overview()["has_references"]
+    assert doc.overview()["has_summary"]
+    assert doc.overview()["has_toc"]
+    assert doc.overview()["has_concepts"]
     assert doc.write(str(output_path))
 
     restored = DocLangXDocument()
@@ -230,9 +230,9 @@ def test_doclangx_document_document_level_annotations_round_trip(tmp_path):
     assert restored.document_reference() == "@article{document, title={Document}}\n"
     assert restored.references() == "@article{reference, title={Reference}}\n"
     # the sidecars come back as parsed DoclangDocument objects
-    assert restored.document_summary().valid()
-    assert "<text>Summary</text>" in restored.document_summary().xml()
-    assert restored.document_summary().at(xpath="/doclang[1]/text[1]") == "Summary"
+    assert restored.summary().valid()
+    assert "<text>Summary</text>" in restored.summary().xml()
+    assert restored.summary().at(xpath="/doclang[1]/text[1]") == "Summary"
     assert 'xpath="/doclang[1]/section[1]"' in restored.toc().xml()
     assert "<header>FeSe</header>" in restored.concepts().xml()
 
@@ -243,7 +243,7 @@ def test_doclangx_document_document_level_annotations_round_trip(tmp_path):
     restored.clear_concepts()
     assert restored.document_reference() is None
     assert restored.references() is None
-    assert restored.document_summary() is None
+    assert restored.summary() is None
     assert restored.toc() is None
     assert restored.concepts() is None
 
@@ -428,8 +428,8 @@ def test_doclangx_document_read_xml_drops_previous_dclx_state(tmp_path):
     assert doc.valid()
     assert not doc.has_archive()
     assert not doc.has_annotations()
-    assert doc.summary()["properties"] == 0
-    assert doc.summary()["instances"] == 0
+    assert doc.overview()["properties"] == 0
+    assert doc.overview()["instances"] == 0
 
 
 def test_doclangx_document_at_resolves_doclang_paths():
@@ -479,8 +479,8 @@ def test_doclangx_nlp_reuses_initialised_models_across_documents():
 
     assert nlp.apply(first, progress_every=0)
     assert nlp.apply(second, progress_every=0)
-    assert first.summary()["instances"] == 0
-    assert second.summary()["instances"] == 0
+    assert first.overview()["instances"] == 0
+    assert second.overview()["instances"] == 0
 
 
 def test_doclangx_nlp_reports_uninitialised_apply():

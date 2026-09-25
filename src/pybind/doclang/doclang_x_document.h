@@ -48,7 +48,7 @@ namespace andromeda_py
 
     std::optional<std::string> document_reference() const;
     std::optional<std::string> references() const;
-    std::optional<DoclangDocument> document_summary() const;
+    std::optional<DoclangDocument> summary() const;
     std::optional<DoclangDocument> toc() const;
     std::optional<DoclangDocument> concepts() const;
 
@@ -64,7 +64,7 @@ namespace andromeda_py
     void clear_toc();
     void clear_concepts();
 
-    nlohmann::json summary() const;
+    nlohmann::json overview() const;
     pybind11::object properties() const;
     pybind11::object entities() const;
     pybind11::object instances() const;
@@ -251,7 +251,7 @@ namespace andromeda_py
     return DoclangDocument(sidecar.value());
   }
 
-  inline std::optional<DoclangDocument> DocLangXDocument::document_summary() const
+  inline std::optional<DoclangDocument> DocLangXDocument::summary() const
   {
     return to_sidecar_wrapper(doc->get_summary());
   }
@@ -316,7 +316,7 @@ namespace andromeda_py
     doc->clear_concepts();
   }
 
-  inline nlohmann::json DocLangXDocument::summary() const
+  inline nlohmann::json DocLangXDocument::overview() const
   {
     return nlohmann::json::object({
         {"valid", valid()},

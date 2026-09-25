@@ -283,14 +283,14 @@ if not doc.write("output.dclx"):
 | `has_archive()` / `archive_paths()` | Inspect the retained DCLX archive and its entries. |
 | `has_annotations()` / `annotation_paths()` | Inspect loaded annotations and their stable archive paths. |
 | `document_reference()` / `references()` | Return optional BibTeX content for the document and its citations. |
-| `document_summary()` / `toc()` / `concepts()` | Return the DCLG document-level annotations as optional `DoclangDocument` objects. |
+| `summary()` / `toc()` / `concepts()` | Return the DCLG document-level annotations as optional `DoclangDocument` objects. |
 | `set_*()` / `clear_*()` | Set or remove document-level annotations; DCLG setters validate their XML contract. |
 | `xml()` | Return the raw DocLang XML the document was parsed from. |
 | `at(xpath=..., mode="auto")` | Read a DocLang path as text or XML. |
 | `__iter__` | Yield direct child elements of `<doclang>` one at a time. |
 | `iterate_items(xpath=None)` | Yield direct children as `(xpath, item, page_no, bbox)`. |
 | `iterate_items_on_page(page_no)` | Yield root items on a 1-based page. |
-| `summary()` | Return document and annotation counts as a dictionary. |
+| `overview()` | Return document and annotation counts as a dictionary. |
 | `properties()`, `entities()`, `instances()`, `relations()`, `edges()` | Return the corresponding annotation table as a pandas DataFrame. |
 | `query_*()` | Return a filtered pandas DataFrame for the corresponding annotation type. |
 | `apply_nlp(models, progress_every=25)` | Initialise and apply models for one document. |
@@ -324,13 +324,13 @@ annotation and NLP surface on top. The DCLG sidecars are returned as
 `DoclangDocument` objects sharing the parsed sidecar allocation:
 
 ```python
-summary = doc.document_summary()
+summary = doc.summary()
 if summary is not None:
     print(summary.at(xpath="/doclang[1]/text[1]"))
 ```
 
-Python `summary()` remains the count/status dictionary; `document_summary()`
-is the summary sidecar.
+Python `overview()` returns the count/status dictionary; `summary()` returns
+the optional summary sidecar.
 
 `at()` requires keyword arguments. Its `mode` is `"auto"` by default; use
 `"text"` for text content or `"doclang"` for serialised DocLang XML. Paths

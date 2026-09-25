@@ -202,7 +202,7 @@ def build_topology(paths: list[Path], args: argparse.Namespace) -> dict[str, Any
             materialize_edges=not args.no_materialize_edges,
             derived_entities=args.derived_entities,
         )
-        summary = doc.summary()
+        summary = doc.overview()
         documents.append({"path": str(path), **summary})
 
         add_entity_counts(

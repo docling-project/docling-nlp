@@ -438,18 +438,56 @@ print(doc.at(xpath="/doclang[1]/text[1]"))
 | `valid()` / `last_error()` | Parse status and failure message |
 | `xml()` | The raw DocLang XML the document was parsed from |
 | `at(xpath=..., mode="auto")` | Read a DocLang path as text or XML |
+| `bounding_box(xpath)` | Return `((x0, y0), (x1, y1))` as floats, or `None` |
+| `page_number(xpath)` | Return the 1-based page containing a node, or `None` |
 | `__iter__` | Yield direct children of `<doclang>` one at a time |
 | `iterate_items(xpath=None)` | Yield direct children as `(xpath, item, page_no, bbox)` |
 | `iterate_items_on_page(page_no)` | Yield root items on a 1-based page |
 
+`DoclangDocument` accepts a DCLG string in its constructor or through
+`read_xml()`. It does not read a file path; use `DocLangXDocument.read(path)`
+for `.dclg` and `.dclx` files. An unsuccessful parse returns `False`; inspect
+`last_error()` for the reason.
+
+```python
+doc = DoclangDocument(
+    '<doclang version="0.7">'
+    '<text><location value="10"/><location value="20"/>'
+    '<location value="30"/><location value="40"/>First</text>'
+    '<page_break/><text>Second</text>'
+    '</doclang>'
+)
+
+for xpath, item, page_no, bbox in doc.iterate_items():
+    print(xpath, item["text"], page_no, bbox)
+
+assert doc.bounding_box("/doclang[1]/text[1]") == (
+    (10.0, 20.0), (30.0, 40.0)
+)
+assert doc.page_number("/doclang[1]/text[2]") == 2
+```
+
 Iteration yields dictionaries with `name`, `xml`, and `text` keys. Use `xml()`
 to get the full document for Python-side parsing. `at()` requires keyword
-arguments. In `iterate_items()` results, `page_no` is `None` for a page break
-and `bbox` is either `None` or four rounded integers in the 0–1000 coordinate
-space. A supplied `xpath` limits iteration to that node's direct children.
+arguments; its modes are `"auto"`, `"text"`, and `"doclang"`.
+`iterate_items()` is a lazy iterator. Its `page_no` is 1-based and is `None`
+for a page-break item. Its `bbox` is `None` when the item has no valid location,
+or a list of four rounded integers in DocLang's 0–1000 coordinate space.
+`bounding_box()` instead returns two pairs of unrounded floats. An unresolved
+path makes `bounding_box()` or `page_number()` return `None` and sets
+`last_error()`. `iterate_items(xpath=...)` raises `ValueError` for an unresolved
+path; `iterate_items_on_page()` requires a page number of at least 1.
+
+A supplied `xpath` limits iteration to that node's direct children. For
+example, `doc.iterate_items(xpath="/doclang[1]/table[1]")` visits that table's
+children. `iterate_items_on_page(2)` visits root items on page 2 and excludes
+page-break items.
+
 Lists are expanded into one logical `list_item` per `<ldiv>` delimiter; each
 item has an XPath ending in `/ldiv[n]` and a well-formed `<list_item>` XML
-fragment. Plain `for element in doc` still yields direct root children.
+fragment. This works for nested and flat delimiter forms. Plain
+`for element in doc` still yields direct root children, including the original
+`list` element, as dictionaries rather than four-part tuples.
 
 ### `DocLangXDocument` — the archive layer
 
@@ -478,13 +516,17 @@ if not doc.write("output.dclx"):
 | Method | Purpose |
 | --- | --- |
 | `read(path)` | Read a `.dclx` archive or `.dclg` XML file |
+| `read_xml(xml)` | Replace the document with bare DCLG XML, clearing prior archive and annotation state |
 | `write(path)` | Write the document as DCLX, including annotations |
+| `source_path()` | Path passed to `read()`, or an empty string for an XML-only document |
+| `hash(text)` | Reproducible text hash, useful in entity and edge queries |
 | `has_archive()` / `archive_paths()` | Inspect the retained archive |
-| `has_annotations()` / `annotation_paths()` | Inspect loaded annotations |
+| `has_annotations()` | Whether any annotation data or document-level annotation is present |
+| `annotation_paths()` | List the supported annotation entry names, whether or not they are present |
 | `document_reference()` / `references()` | Optional BibTeX content |
-| `document_summary()` / `toc()` / `concepts()` | Sidecars, as optional `DoclangDocument` |
+| `summary()` / `toc()` / `concepts()` | Sidecars, as optional `DoclangDocument` |
 | `set_*()` / `clear_*()` | Set or remove document-level annotations |
-| `summary()` | Document and annotation **counts and status flags**, as a dictionary |
+| `overview()` | Document and annotation **counts and status flags**, as a dictionary |
 | `properties()`, `entities()`, `instances()`, `relations()`, `edges()` | Annotation tables as pandas DataFrames |
 | `query_*()` | Filtered pandas DataFrames |
 | `apply_nlp(models, progress_every=25)` | Initialise and apply models to one document |
@@ -492,15 +534,37 @@ if not doc.write("output.dclx"):
 
 Pandas is imported lazily, when a table or query method is first called.
 
-> **Naming note.** `summary()` returns the count/status dictionary, as it always
-> has. The summary *sidecar* is `document_summary()`. The names are distinct
-> because the two predate each other, not because they are related.
+The query methods accept optional filters and return DataFrames with the same
+columns as their unfiltered counterparts:
+
+| Method | Filters |
+| --- | --- |
+| `query_properties()` | `type`, `label`, `subj_path`, `min_conf` |
+| `query_entities()` | `type`, `subtype`, `name`, `name_contains`, `entity_kind`, `min_count` |
+| `query_instances()` | `type`, `subtype`, `name`, `name_contains`, `subj_path`, `min_conf`, `entity_hash` |
+| `query_relations()` | `name`, `name_i`, `name_j`, `name_contains`, `min_conf` |
+| `query_edges()` | `name`, `hash_i`, `hash_j`, `min_count` |
+
+String filters default to the empty string and numeric filters default to zero,
+which leaves that filter inactive. Filters can be combined:
+
+```python
+mentions = doc.query_instances(
+    type="term",
+    subj_path="/doclang[1]/text[1]",
+    min_conf=0.8,
+    entity_hash=DocLangXDocument.hash("Western Europe"),
+)
+```
+
+`overview()` returns counts and status flags; `summary()` returns the optional
+summary sidecar as a `DoclangDocument`.
 
 Sidecar getters return an optional `DoclangDocument` sharing the parsed
 allocation, so the full DCLG surface is available on them:
 
 ```python
-summary = doc.document_summary()
+summary = doc.summary()
 if summary is not None:
     print(summary.at(xpath="/doclang[1]/text[1]"))
 ```
@@ -509,6 +573,21 @@ The DCLG setters validate against the structural contracts in section 4 and
 return `False` with a message in `last_error()` when the XML does not satisfy
 them.
 
+The document-level annotation methods are:
+
+| Content | Get | Set | Remove |
+| --- | --- | --- | --- |
+| Citation for this document | `document_reference()` | `set_document_reference(bibtex)` | `clear_document_reference()` |
+| Cited references | `references()` | `set_references(bibtex)` | `clear_references()` |
+| Summary DCLG | `summary()` | `set_document_summary(dclg)` | `clear_document_summary()` |
+| Table of contents DCLG | `toc()` | `set_toc(dclg)` | `clear_toc()` |
+| Concepts DCLG | `concepts()` | `set_concepts(dclg)` | `clear_concepts()` |
+
+The BibTeX setters accept strings. The DCLG setters accept XML strings and
+validate their structure. A missing getter returns `None`; a present DCLG
+sidecar can be read and traversed like any other `DoclangDocument`. The
+corresponding `clear_*()` method removes it.
+
 ### Reusing models across documents
 
 `DocLangXNlp` initialises a model expression once and applies it repeatedly:
@@ -516,12 +595,24 @@ them.
 ```python
 from docling_nlp.andromeda_doclang import DocLangXNlp, DocLangXDocument
 
-nlp = DocLangXNlp("language;term")
+nlp = DocLangXNlp()
+if not nlp.initialise("language;term"):
+    raise RuntimeError(nlp.last_error())
+
+print(nlp.initialised(), nlp.model_expr(), nlp.models())
 for path in paths:
     doc = DocLangXDocument()
-    if doc.read(path) and nlp.apply(doc):
-        doc.write(f"{path}.nlp.dclx")
+    if not doc.read(path):
+        raise RuntimeError(doc.last_error())
+    if not nlp.apply(doc, progress_every=25):
+        raise RuntimeError(doc.last_error())
+    if not doc.write(f"{path}.nlp.dclx"):
+        raise RuntimeError(doc.last_error())
 ```
+
+The constructor also accepts a model expression. `DocLangXDocument.apply_nlp()`
+is the one-document shortcut: it initialises models for that call. Use
+`DocLangXNlp` when processing multiple documents with the same models.
 
 ### Two things that differ from the C++ surface
 
@@ -577,6 +668,8 @@ iteration helpers, `hash()`, and the error accessors — keeps its previous name
 and signatures; it simply lives on the base class now. Code that used the XML
 surface should compile after switching the include and the type name.
 
-On the Python side, `DocLangXDocument` keeps its full existing API. The only
-change to it is additive: the document-level annotation accessors, and the new
-`DoclangDocument` base type.
+On the Python side, `DocLangXDocument` inherits the new `DoclangDocument`
+base type. Code using `elements()` must switch to direct iteration or
+`iterate_items()`. Code unpacking `(xpath, item)` from `iterate_items()` must
+now unpack `(xpath, item, page_no, bbox)`. The iterator also expands lists into
+individual logical items. Document-level annotation accessors are additive.

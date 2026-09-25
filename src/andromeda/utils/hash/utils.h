@@ -59,7 +59,7 @@ namespace andromeda
       return hash;      
     }
     
-    static uint64_t to_hash(const std::vector<uint64_t>& hashes)
+    [[maybe_unused]] static uint64_t to_hash(const std::vector<uint64_t>& hashes)
     {
       switch(hashes.size())
         {
@@ -89,7 +89,7 @@ namespace andromeda
         }
     }
 
-    static uint16_t to_flvr_hash(const std::string& text)
+    [[maybe_unused]] static uint16_t to_flvr_hash(const std::string& text)
     {
       const static std::string seed = "QWERTYUIOP!@#$%^&*()_+qwertyuiop";
       std::string name = seed + text;
