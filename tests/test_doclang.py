@@ -286,11 +286,11 @@ def test_doclang_document_bounding_box_and_page_number(document_type):
         '<doclang version="0.7">'
         '<text><location value="10"/><location value="20.5"/>'
         '<location value="30"/><location value="40"/>First</text>'
-        '<page_break/>'
+        "<page_break/>"
         '<table><cell><location value="0"/><location value="100"/>'
         '<location value="500"/><location value="1000"/>Second</cell></table>'
-        '<text>Unlocated</text>'
-        '</doclang>'
+        "<text>Unlocated</text>"
+        "</doclang>"
     )
 
     first = "/doclang[1]/text[1]"
@@ -353,7 +353,7 @@ def test_doclangx_document_is_a_doclang_document():
 
 
 def test_doclang_iterator_keeps_document_alive():
-    doc = DoclangDocument('<doclang><text>One</text><text>Two</text></doclang>')
+    doc = DoclangDocument("<doclang><text>One</text><text>Two</text></doclang>")
     items = doc.iterate_items()
     del doc
 
@@ -368,18 +368,18 @@ def test_doclang_iterate_items_expands_flat_and_nested_lists(document_type):
     doc = document_type()
     assert doc.read_xml(
         '<doclang version="0.7">'
-        '<list><ldiv><marker>•</marker></ldiv>'
+        "<list><ldiv><marker>•</marker></ldiv>"
         '<location value="10"/><location value="20"/>'
         '<location value="30"/><location value="40"/>First &amp; more'
-        '<ldiv><marker>•</marker></ldiv>'
+        "<ldiv><marker>•</marker></ldiv>"
         '<location value="50"/><location value="60"/>'
         '<location value="70"/><location value="80"/>Second</list>'
-        '<page_break/>'
-        '<list><ldiv><marker>a.</marker>'
+        "<page_break/>"
+        "<list><ldiv><marker>a.</marker>"
         '<location value="90"/><location value="100"/>'
         '<location value="110"/><location value="120"/>Nested one</ldiv>'
-        '<ldiv><marker>b.</marker>Nested two</ldiv></list>'
-        '</doclang>'
+        "<ldiv><marker>b.</marker>Nested two</ldiv></list>"
+        "</doclang>"
     )
 
     items = list(doc.iterate_items())
@@ -391,7 +391,10 @@ def test_doclang_iterate_items_expands_flat_and_nested_lists(document_type):
         "/doclang[1]/list[2]/ldiv[2]",
     ]
     assert [item["text"] for _, item, _, _ in items if item["name"] == "list_item"] == [
-        "First & more", "Second", "Nested one", "Nested two"
+        "First & more",
+        "Second",
+        "Nested one",
+        "Nested two",
     ]
     assert [entry[2:] for entry in items] == [
         (1, [10, 20, 30, 40]),
