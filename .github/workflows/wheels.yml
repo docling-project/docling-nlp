@@ -313,7 +313,7 @@ jobs:
           # Order matters. `uv sync` makes the venv match the lockfile exactly,
           # so installing the wheel first just gets it removed again
           # ("Uninstalled 1 package") and the tests then import nothing.
-          uv sync --all-extras --no-install-project
+          uv sync --no-default-groups --group test --no-install-project
           wheel_file=$(ls dist/*.whl | head -n 1)
           uv pip install "$wheel_file"
           # Resolve the venv interpreter and run the import check from outside
