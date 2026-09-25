@@ -1,4 +1,5 @@
 ### Custom ###
+tests/data/*
 *.dclx
 *.csv
 *.model
@@ -44,6 +45,10 @@ docling_nlp/resources/*/*/*.jsonl
 docling_nlp/resources/*/*/*/*.txt
 docling_nlp/resources/*/*/*/*.json
 docling_nlp/resources/*/*/*/*.jsonl
+# the lock file stamping which revision the downloaded artifacts came from: it
+# describes a local download, not the source tree
+docling_nlp/resources/models.lock.json
+
 docling_nlp/resources/data_nlp/*.txt
 docling_nlp/resources/data_nlp/*.json
 docling_nlp/resources/data_nlp/*.jsonl

@@ -28,7 +28,11 @@ def run(cmd: List[str], cwd: str="./"):
     print_cmd = " ".join(cmd)
     print(f"\nlaunch: {print_cmd}")
 
-    message = subprocess.run(cmd, cwd=cwd)
+    # ExternalProject dependencies use older CMake policy versions. CMake 4
+    # requires at least 3.5, including in their separate configure processes.
+    env = os.environ.copy()
+    env.setdefault("CMAKE_POLICY_VERSION_MINIMUM", "3.5")
+    message = subprocess.run(cmd, cwd=cwd, env=env)
 
     if "returncode=0" in str(message):
         print(f" -> SUCCESS")

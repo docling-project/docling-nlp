@@ -1,0 +1,16 @@
+data:
+  train_file: artifacts/grobid-crf-references/train.jsonl
+  validation_file: artifacts/grobid-crf-references/validation.jsonl
+
+training:
+  model_name: references
+  epochs: 20
+  gaussian_sigma: 2.0
+  loglevel: WARNING
+  verbose: false
+
+output:
+  directory: artifacts/grobid-crf-references/model
+  prepared_file: references.annot.jsonl
+  model_file: crf_reference.bin
+  metrics_file: validation_metrics.txt

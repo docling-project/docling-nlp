@@ -1,0 +1,41 @@
+data:
+  repo_id: docling-project/docling-nlp-datasets
+  revision: main
+  train_file: data/fasttext/semantic/train.csv
+  validation_file: data/fasttext/semantic/validation.csv
+
+training:
+  # When true, null search parameters below are selected by FastText autotune.
+  autotune: true
+  # Workflow default: 3600 seconds. Native FastText default: 300 seconds.
+  duration: 360
+  # Workflow default: 100M. Native FastText default: unlimited/no quantization.
+  model_size: 100M
+  # FastText default objective: global F1. Examples: f1, f1:reference.
+  metric: f1
+  # FastText default: 1 prediction per validation example.
+  predictions: 1
+
+  # Null means "do not pass the option": autotune may select it, otherwise the
+  # FastText supervised default shown on each line is used.
+  learning_rate: null     # default 0.1; autotune range 0.01-5.0
+  epochs: null            # default 5; autotune range 1-100
+  dimension: null         # default 100; autotune range 1-1000
+  context_window: null    # default 5; not optimized by autotune
+  ngram: null             # default 1; autotune range 1-5
+  loss: null              # default softmax; choices: softmax, ova, hs, ns
+  min_count: null         # default 1; not optimized by autotune
+  min_char_ngram: 2       # default 0; autotune choices: 0, 2, 3
+  max_char_ngram: 5       # default 0; autotune sets min_char_ngram + 3
+  bucket: null            # default 2000000; autotune range 10000-10000000
+  threads: null           # default 12; use 1 for reproducible training
+  seed: null              # default 0; thread count must be 1 for reproducibility
+  loglevel: WARNING
+
+output:
+  directory: artifacts/semantic
+  data_directory: data
+  dataset_file: semantic.jsonl
+  model_file: fst_semantic.bin
+  metrics_file: validation_metrics.txt
+  manifest_file: manifest.json

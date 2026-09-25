@@ -134,7 +134,17 @@ namespace andromeda
       case SEMANTIC:
 	{
 	  typedef nlp_model<CLS, SEMANTIC> model_type;
-	  model = std::make_shared<model_type>();
+	  const std::string prefix = "semantic(";
+	  if(desc.starts_with(prefix) and desc.ends_with(")"))
+	    {
+	      model = std::make_shared<model_type>(
+	        std::filesystem::path(desc.substr(prefix.size(),
+	                                          desc.size()-prefix.size()-1)));
+	    }
+	  else
+	    {
+	      model = std::make_shared<model_type>();
+	    }
 	}
 	break;	
 	

@@ -73,10 +73,12 @@ namespace andromeda
     
     double learning_rate;
     int epoch, dim, ws, ngram;
+    int min_count, minn, maxn, bucket, thread, seed;
+    std::string loss;
 
     bool autotune;
-    std::string modelsize;
-    int duration; // in seconds
+    std::string modelsize, autotune_metric;
+    int duration, autotune_predictions; // duration is in seconds
 
     std::set<std::string> explicit_hpo_parameters;
     std::set<std::string> explicit_train_parameters;
@@ -107,10 +109,19 @@ namespace andromeda
     dim(64),
     ws(3),
     ngram(0),
+    min_count(1),
+    minn(0),
+    maxn(0),
+    bucket(2000000),
+    thread(12),
+    seed(0),
+    loss("softmax"),
 
     autotune(false),
     modelsize("100M"),
+    autotune_metric("f1"),
     duration(360),
+    autotune_predictions(1),
 
     explicit_hpo_parameters({}),
     explicit_train_parameters({}),
@@ -206,6 +217,8 @@ namespace andromeda
       hpo["autotune"] = autotune;
       hpo["modelsize"] = modelsize;
       hpo["duration"] = duration;
+      hpo["metric"] = autotune_metric;
+      hpo["predictions"] = autotune_predictions;
     }
     
     nlohmann::json args;
@@ -219,6 +232,13 @@ namespace andromeda
       args["ws"] = ws;
 
       args["n-gram"] = ngram;
+      args["loss"] = loss;
+      args["min-count"] = min_count;
+      args["min-char-ngram"] = minn;
+      args["max-char-ngram"] = maxn;
+      args["bucket"] = bucket;
+      args["thread"] = thread;
+      args["seed"] = seed;
     }
 
     nlohmann::json files;
@@ -246,31 +266,65 @@ namespace andromeda
 
     auto files = config["files"];    
 
+    explicit_hpo_parameters.clear();
+    explicit_train_parameters.clear();
+
     for(auto itr:hpo_args.items())
       {
-	explicit_hpo_parameters.insert(itr.key());
+	if(not itr.value().is_null())
+	  {
+	    explicit_hpo_parameters.insert(itr.key());
+	  }
       }
 
     for(auto itr:train_args.items())
       {
-	explicit_train_parameters.insert(itr.key());
+	if(not itr.value().is_null())
+	  {
+	    explicit_train_parameters.insert(itr.key());
+	  }
       }
     
     // HPO
     {
-      autotune = hpo_args.value("autotune", autotune);
-      
-      modelsize = hpo_args.value("modelsize", modelsize);
-      duration = hpo_args.value("duration", duration);
+      if(explicit_hpo_parameters.count("autotune"))
+	autotune = hpo_args.at("autotune").get<bool>();
+      if(explicit_hpo_parameters.count("modelsize"))
+	modelsize = hpo_args.at("modelsize").get<std::string>();
+      if(explicit_hpo_parameters.count("duration"))
+	duration = hpo_args.at("duration").get<int>();
+      if(explicit_hpo_parameters.count("metric"))
+	autotune_metric = hpo_args.at("metric").get<std::string>();
+      if(explicit_hpo_parameters.count("predictions"))
+	autotune_predictions = hpo_args.at("predictions").get<int>();
     }
 
     // parameters
     {
-      learning_rate = train_args.value("learning-rate", learning_rate);
-      epoch = train_args.value("epoch", epoch);
-      dim = train_args.value("dim", dim);
-      ws = train_args.value("ws", ws);
-      ngram = train_args.value("n-gram", ngram);
+      if(explicit_train_parameters.count("learning-rate"))
+	learning_rate = train_args.at("learning-rate").get<double>();
+      if(explicit_train_parameters.count("epoch"))
+	epoch = train_args.at("epoch").get<int>();
+      if(explicit_train_parameters.count("dim"))
+	dim = train_args.at("dim").get<int>();
+      if(explicit_train_parameters.count("ws"))
+	ws = train_args.at("ws").get<int>();
+      if(explicit_train_parameters.count("n-gram"))
+	ngram = train_args.at("n-gram").get<int>();
+      if(explicit_train_parameters.count("loss"))
+	loss = train_args.at("loss").get<std::string>();
+      if(explicit_train_parameters.count("min-count"))
+	min_count = train_args.at("min-count").get<int>();
+      if(explicit_train_parameters.count("min-char-ngram"))
+	minn = train_args.at("min-char-ngram").get<int>();
+      if(explicit_train_parameters.count("max-char-ngram"))
+	maxn = train_args.at("max-char-ngram").get<int>();
+      if(explicit_train_parameters.count("bucket"))
+	bucket = train_args.at("bucket").get<int>();
+      if(explicit_train_parameters.count("thread"))
+	thread = train_args.at("thread").get<int>();
+      if(explicit_train_parameters.count("seed"))
+	seed = train_args.at("seed").get<int>();
     }
     
     // files
@@ -517,12 +571,9 @@ namespace andromeda
     auto char_normaliser = text_element::create_char_normaliser(false);
     auto text_normaliser = text_element::create_text_normaliser(false);
 
-    std::size_t cnt=0;
     std::string line, orig="null", text="null", label="null";
     while(std::getline(ifs, line))
       {
-	std::cout << "\r\t#-lines: " << cnt++ << std::flush;
-	
 	nlohmann::json item = nlohmann::json::parse(line);
 
 	bool training_sample = bool(dis(gen)<0.9);
@@ -627,6 +678,18 @@ namespace andromeda
 	    args_vec.push_back("-autotune-modelsize");
 	    args_vec.push_back(modelsize);
 	  }
+
+	if(explicit_hpo_parameters.count("metric"))
+	  {
+	    args_vec.push_back("-autotune-metric");
+	    args_vec.push_back(autotune_metric);
+	  }
+
+	if(explicit_hpo_parameters.count("predictions"))
+	  {
+	    args_vec.push_back("-autotune-predictions");
+	    args_vec.push_back(std::to_string(autotune_predictions));
+	  }
       }
 
     if(explicit_train_parameters.count("dim"))
@@ -656,8 +719,50 @@ namespace andromeda
     if(explicit_train_parameters.count("epoch"))
       {
 	args_vec.push_back("-epoch");
-	args_vec.push_back(std::to_string(dim));	
-      }    
+	args_vec.push_back(std::to_string(epoch));
+      }
+
+    if(explicit_train_parameters.count("loss"))
+      {
+	args_vec.push_back("-loss");
+	args_vec.push_back(loss);
+      }
+
+    if(explicit_train_parameters.count("min-count"))
+      {
+	args_vec.push_back("-minCount");
+	args_vec.push_back(std::to_string(min_count));
+      }
+
+    if(explicit_train_parameters.count("min-char-ngram"))
+      {
+	args_vec.push_back("-minn");
+	args_vec.push_back(std::to_string(minn));
+      }
+
+    if(explicit_train_parameters.count("max-char-ngram"))
+      {
+	args_vec.push_back("-maxn");
+	args_vec.push_back(std::to_string(maxn));
+      }
+
+    if(explicit_train_parameters.count("bucket"))
+      {
+	args_vec.push_back("-bucket");
+	args_vec.push_back(std::to_string(bucket));
+      }
+
+    if(explicit_train_parameters.count("thread"))
+      {
+	args_vec.push_back("-thread");
+	args_vec.push_back(std::to_string(thread));
+      }
+
+    if(explicit_train_parameters.count("seed"))
+      {
+	args_vec.push_back("-seed");
+	args_vec.push_back(std::to_string(seed));
+      }
     
     if(model==NULL)
       {

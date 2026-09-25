@@ -14,6 +14,62 @@
 To get easily started, simply install the `docling-nlp` package from PyPi. This can be
 done using the traditional `pip install docling-nlp` or via uv `uv add docling-nlp`.
 
+### Downloading the NLP model artifacts
+
+The pretrained NLP models live in a HuggingFace repository and are fetched on demand.
+The `docling-nlp-tools` CLI downloads them ahead of time, which is handy to prepare an
+offline or containerised environment,
+
+```sh
+# list the available models and see which ones are downloaded and up to date
+docling-nlp-tools models list
+
+# describe one model: what it does, how big it is and which labels it produces
+docling-nlp-tools models info reference
+
+# download all model artifacts
+docling-nlp-tools models download
+
+# download a selection, by name or by kind
+docling-nlp-tools models download language geoloc
+docling-nlp-tools models download --kind crf
+
+# download into a specific directory (instead of the packaged resources directory)
+docling-nlp-tools models download --all --output-dir ./artifacts/models
+```
+
+When downloading into a custom directory, the packaged support resources the NLP
+models also read (confusables tables, regex data, tokenizer and JSON configurations)
+are copied along, so the directory is a complete resources directory. Point
+`DOCLING_NLP_RESOURCES_DIR` to it and `docling-nlp` picks the models up,
+
+```sh
+export DOCLING_NLP_RESOURCES_DIR=./artifacts/models
+```
+
+Pass `--no-standalone` to download only the model artifacts themselves.
+
+`models.json` pins the revision of the HuggingFace repository, and the downloader stamps
+which revision every artifact came from in a `models.lock.json` next to them. When the
+pin moves, `models list` marks the artifacts left behind as `stale` and the next
+`models download` refetches exactly those, without needing `--force`. See
+[the download guide](docs/downloading-nlp-models.md) for the details.
+
+The same can be done from Python,
+
+```python
+from docling_nlp.utils.load_pretrained_models import (
+    download_pretrained_nlp_models,
+    list_pretrained_nlp_models,
+)
+
+list_pretrained_nlp_models()  # -> [NlpModelSpec(name='part-of-speech', kind='crf', ...), ...]
+download_pretrained_nlp_models(names=["language", "geoloc"], force=False, verbose=True)
+```
+
+See [`docs/downloading-nlp-models.md`](docs/downloading-nlp-models.md) for the full CLI
+reference, the list of model artifacts, and the Docker/CI recipes.
+
 Below, you can find the code-snippet to process pieces of text,
 
 ```python

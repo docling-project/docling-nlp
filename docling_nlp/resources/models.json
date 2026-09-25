@@ -1,7 +1,7 @@
 {
     "huggingface": {
 	"repo-id": "docling-project/docling-nlp-models",
-	"revision": "c1be31d505b231948ca432c29ceb5205d9971a77"
+	"revision": "0fc3b3e19e76259818ee360d85edf26f4131be8a"
 	},
     
     "nlp":

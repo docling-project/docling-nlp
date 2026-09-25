@@ -29,7 +29,7 @@ namespace andromeda
   public:
 
     nlp_model();
-    nlp_model(std::filesystem::path resources_dir);
+    explicit nlp_model(std::filesystem::path model_file);
 
     ~nlp_model();
 
@@ -74,6 +74,13 @@ namespace andromeda
   nlp_model<CLS, SEMANTIC>::nlp_model():
     fasttext_supervised_model(),
     model_file(glm_variables::get_fst_dir() / "semantic/fst_semantic.bin")
+  {
+    initialise();
+  }
+
+  nlp_model<CLS, SEMANTIC>::nlp_model(std::filesystem::path model_file_):
+    fasttext_supervised_model(),
+    model_file(std::move(model_file_))
   {
     initialise();
   }

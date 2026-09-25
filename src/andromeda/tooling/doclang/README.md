@@ -283,12 +283,14 @@ if not doc.write("output.dclx"):
 | `has_archive()` / `archive_paths()` | Inspect the retained DCLX archive and its entries. |
 | `has_annotations()` / `annotation_paths()` | Inspect loaded annotations and their stable archive paths. |
 | `document_reference()` / `references()` | Return optional BibTeX content for the document and its citations. |
-| `document_summary()` / `toc()` / `concepts()` | Return the DCLG document-level annotations as optional `DoclangDocument` objects. |
+| `summary()` / `toc()` / `concepts()` | Return the DCLG document-level annotations as optional `DoclangDocument` objects. |
 | `set_*()` / `clear_*()` | Set or remove document-level annotations; DCLG setters validate their XML contract. |
 | `xml()` | Return the raw DocLang XML the document was parsed from. |
 | `at(xpath=..., mode="auto")` | Read a DocLang path as text or XML. |
-| `elements(name="")` / `__iter__` | Iterate the direct child elements of `<doclang>`. |
-| `summary()` | Return document and annotation counts as a dictionary. |
+| `__iter__` | Yield direct child elements of `<doclang>` one at a time. |
+| `iterate_items(xpath=None)` | Yield direct children as `(xpath, item, page_no, bbox)`. |
+| `iterate_items_on_page(page_no)` | Yield root items on a 1-based page. |
+| `overview()` | Return document and annotation counts as a dictionary. |
 | `properties()`, `entities()`, `instances()`, `relations()`, `edges()` | Return the corresponding annotation table as a pandas DataFrame. |
 | `query_*()` | Return a filtered pandas DataFrame for the corresponding annotation type. |
 | `apply_nlp(models, progress_every=25)` | Initialise and apply models for one document. |
@@ -307,22 +309,28 @@ for element in doc:
     print(element["name"], element["text"])
 ```
 
-Each element is a dictionary with `name`, `xml`, and `text` fields. Use
-`elements(name="text")` to retrieve only a named element type.
+Each element is a dictionary with `name`, `xml`, and `text` fields. Use `xml()`
+to get the full document for Python-side parsing or filtering. `iterate_items()`
+returns `None` for unavailable page numbers or boxes; otherwise its box has
+four rounded integers in the 0–1000 coordinate space. A supplied `xpath`
+restricts iteration to that node's direct children. Lists are expanded into
+one logical `list_item` per `<ldiv>` delimiter, including flat delimiter forms;
+each item has an XPath ending in `/ldiv[n]` and a well-formed `<list_item>` XML
+fragment. Plain `for element in doc` still yields direct root children.
 
-`read_xml()`, `valid()`, `xml()`, `last_error()`, `at()`, `elements()` and
-iteration all come from `DoclangDocument`; `DocLangXDocument` adds the archive,
+`read_xml()`, `valid()`, `xml()`, `last_error()`, `at()`, and iteration all come
+from `DoclangDocument`; `DocLangXDocument` adds the archive,
 annotation and NLP surface on top. The DCLG sidecars are returned as
 `DoclangDocument` objects sharing the parsed sidecar allocation:
 
 ```python
-summary = doc.document_summary()
+summary = doc.summary()
 if summary is not None:
     print(summary.at(xpath="/doclang[1]/text[1]"))
 ```
 
-Python `summary()` remains the count/status dictionary; `document_summary()`
-is the summary sidecar.
+Python `overview()` returns the count/status dictionary; `summary()` returns
+the optional summary sidecar.
 
 `at()` requires keyword arguments. Its `mode` is `"auto"` by default; use
 `"text"` for text content or `"doclang"` for serialised DocLang XML. Paths

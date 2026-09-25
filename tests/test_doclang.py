@@ -1,4 +1,5 @@
 import zipfile
+from xml.etree import ElementTree
 
 import pandas as pd
 import pytest
@@ -69,7 +70,7 @@ def test_doclangx_document_read_query_write(tmp_path):
     assert doc.has_archive()
     assert doc.has_annotations()
 
-    summary = doc.summary()
+    summary = doc.overview()
     assert summary["properties"] == 1
     assert summary["instances"] == 1
     assert summary["relations"] == 1
@@ -126,7 +127,7 @@ def test_doclangx_document_read_query_write(tmp_path):
     assert len(doc.query_instances(type="term", name="missing")) == 0
     assert len(doc.query_relations(name="contains", name_contains="material")) == 1
     assert len(doc.query_relations(name="contains", min_conf=0.9)) == 0
-    assert doc.summary()["edges"] == 0
+    assert doc.overview()["edges"] == 0
 
     doc.materialize_edges()
     edges = doc.edges()
@@ -140,16 +141,16 @@ def test_doclangx_document_read_query_write(tmp_path):
         len(doc.query_edges(name="to-instances", hash_i=DocLangXDocument.hash("FeSe")))
         == 1
     )
-    assert doc.summary()["edges"] == 3
+    assert doc.overview()["edges"] == 3
 
     assert doc.write(str(output_path))
 
     restored = DocLangXDocument()
     assert restored.read(str(output_path))
-    assert restored.summary()["instances"] == 1
-    assert restored.summary()["entities"] == 1
+    assert restored.overview()["instances"] == 1
+    assert restored.overview()["entities"] == 1
     assert len(restored.query_instances(name="FeSe")) == 1
-    assert restored.summary()["edges"] == 3
+    assert restored.overview()["edges"] == 3
     assert len(restored.query_edges(name="to-entities")) == 1
 
 
@@ -190,7 +191,7 @@ def test_doclangx_document_apply_nlp_empty_model_expr(tmp_path):
     doc = DocLangXDocument()
     assert doc.read_xml('<doclang version="0.7"><text>Body text</text></doclang>')
     assert doc.apply_nlp("", progress_every=0)
-    assert doc.summary()["instances"] == 0
+    assert doc.overview()["instances"] == 0
     assert doc.write(str(output_path))
 
     restored = DocLangXDocument()
@@ -217,11 +218,11 @@ def test_doclangx_document_document_level_annotations_round_trip(tmp_path):
         "<abbreviation>FeSe</abbreviation><description>Material</description>"
         "</concept></concepts></doclang>"
     )
-    assert doc.summary()["has_document_reference"]
-    assert doc.summary()["has_references"]
-    assert doc.summary()["has_summary"]
-    assert doc.summary()["has_toc"]
-    assert doc.summary()["has_concepts"]
+    assert doc.overview()["has_document_reference"]
+    assert doc.overview()["has_references"]
+    assert doc.overview()["has_summary"]
+    assert doc.overview()["has_toc"]
+    assert doc.overview()["has_concepts"]
     assert doc.write(str(output_path))
 
     restored = DocLangXDocument()
@@ -229,9 +230,9 @@ def test_doclangx_document_document_level_annotations_round_trip(tmp_path):
     assert restored.document_reference() == "@article{document, title={Document}}\n"
     assert restored.references() == "@article{reference, title={Reference}}\n"
     # the sidecars come back as parsed DoclangDocument objects
-    assert restored.document_summary().valid()
-    assert "<text>Summary</text>" in restored.document_summary().xml()
-    assert restored.document_summary().at(xpath="/doclang[1]/text[1]") == "Summary"
+    assert restored.summary().valid()
+    assert "<text>Summary</text>" in restored.summary().xml()
+    assert restored.summary().at(xpath="/doclang[1]/text[1]") == "Summary"
     assert 'xpath="/doclang[1]/section[1]"' in restored.toc().xml()
     assert "<header>FeSe</header>" in restored.concepts().xml()
 
@@ -242,7 +243,7 @@ def test_doclangx_document_document_level_annotations_round_trip(tmp_path):
     restored.clear_concepts()
     assert restored.document_reference() is None
     assert restored.references() is None
-    assert restored.document_summary() is None
+    assert restored.summary() is None
     assert restored.toc() is None
     assert restored.concepts() is None
 
@@ -265,13 +266,68 @@ def test_doclang_document_iterates_dclg_elements():
 
     assert doc.valid()
     assert doc.xml().startswith("<doclang")
-    assert [element["name"] for element in doc] == ["heading", "text"]
-    assert doc.elements(name="heading")[0]["text"] == "Title"
-    assert "<text>Body</text>" in doc.elements(name="text")[0]["xml"]
+    iterator = iter(doc)
+    assert iter(iterator) is iterator
+    assert next(iterator)["text"] == "Title"
+    assert "<text>Body</text>" in next(iterator)["xml"]
+    with pytest.raises(StopIteration):
+        next(iterator)
+    assert not hasattr(doc, "elements")
 
     invalid = DoclangDocument()
     assert not invalid.read_xml("<text>missing root</text>")
     assert "root <doclang>" in invalid.last_error()
+
+
+@pytest.mark.parametrize("document_type", [DoclangDocument, DocLangXDocument])
+def test_doclang_document_bounding_box_and_page_number(document_type):
+    doc = document_type()
+    assert doc.read_xml(
+        '<doclang version="0.7">'
+        '<text><location value="10"/><location value="20.5"/>'
+        '<location value="30"/><location value="40"/>First</text>'
+        "<page_break/>"
+        '<table><cell><location value="0"/><location value="100"/>'
+        '<location value="500"/><location value="1000"/>Second</cell></table>'
+        "<text>Unlocated</text>"
+        "</doclang>"
+    )
+
+    first = "/doclang[1]/text[1]"
+    second = "/doclang[1]/table[1]/cell[1]"
+    assert doc.bounding_box(first) == ((10.0, 20.5), (30.0, 40.0))
+    assert doc.page_number(first) == 1
+    assert doc.bounding_box(second) == ((0.0, 100.0), (500.0, 1000.0))
+    assert doc.page_number(second) == 2
+    assert doc.page_number("/doclang[1]/text[2]") == 2
+    assert doc.bounding_box("/doclang[1]/text[2]") is None
+    assert doc.bounding_box("/doclang[1]/missing[1]") is None
+    assert "not found" in doc.last_error()
+    assert doc.page_number("/doclang[1]/missing[1]") is None
+
+    items = list(doc.iterate_items())
+    assert [xpath for xpath, _, _, _ in items] == [
+        "/doclang[1]/text[1]",
+        "/doclang[1]/page_break[1]",
+        "/doclang[1]/table[1]",
+        "/doclang[1]/text[2]",
+    ]
+    assert items[0][2:] == (1, [10, 21, 30, 40])
+    assert items[1][2:] == (None, None)
+    assert items[2][2:] == (2, None)
+    assert items[3][2:] == (2, None)
+
+    children = list(doc.iterate_items(xpath="/doclang[1]/table[1]"))
+    assert len(children) == 1
+    assert children[0][0] == "/doclang[1]/table[1]/cell[1]"
+    assert children[0][2:] == (2, [0, 100, 500, 1000])
+    assert list(doc.iterate_items_on_page(1)) == items[:1]
+    assert list(doc.iterate_items_on_page(2)) == items[2:]
+    assert list(doc.iterate_items_on_page(3)) == []
+    with pytest.raises(ValueError, match="not found"):
+        doc.iterate_items(xpath="/doclang[1]/missing[1]")
+    with pytest.raises(ValueError, match="at least 1"):
+        doc.iterate_items_on_page(0)
 
 
 def test_doclangx_document_is_a_doclang_document():
@@ -284,7 +340,78 @@ def test_doclangx_document_is_a_doclang_document():
     assert doc.valid()
     assert doc.xml().startswith("<doclang")
     assert [element["name"] for element in doc] == ["heading", "text"]
-    assert doc.elements(name="heading")[0]["text"] == "Title"
+    items = doc.iterate_items()
+    assert iter(items) is items
+    assert next(items)[0] == "/doclang[1]/heading[1]"
+    xpath, item, page_no, bbox = next(items)
+    assert xpath == "/doclang[1]/text[1]"
+    assert item["text"] == "Body"
+    assert page_no == 1
+    assert bbox is None
+    with pytest.raises(StopIteration):
+        next(items)
+
+
+def test_doclang_iterator_keeps_document_alive():
+    doc = DoclangDocument("<doclang><text>One</text><text>Two</text></doclang>")
+    items = doc.iterate_items()
+    del doc
+
+    assert [(xpath, item["text"]) for xpath, item, _, _ in items] == [
+        ("/doclang[1]/text[1]", "One"),
+        ("/doclang[1]/text[2]", "Two"),
+    ]
+
+
+@pytest.mark.parametrize("document_type", [DoclangDocument, DocLangXDocument])
+def test_doclang_iterate_items_expands_flat_and_nested_lists(document_type):
+    doc = document_type()
+    assert doc.read_xml(
+        '<doclang version="0.7">'
+        "<list><ldiv><marker>•</marker></ldiv>"
+        '<location value="10"/><location value="20"/>'
+        '<location value="30"/><location value="40"/>First &amp; more'
+        "<ldiv><marker>•</marker></ldiv>"
+        '<location value="50"/><location value="60"/>'
+        '<location value="70"/><location value="80"/>Second</list>'
+        "<page_break/>"
+        "<list><ldiv><marker>a.</marker>"
+        '<location value="90"/><location value="100"/>'
+        '<location value="110"/><location value="120"/>Nested one</ldiv>'
+        "<ldiv><marker>b.</marker>Nested two</ldiv></list>"
+        "</doclang>"
+    )
+
+    items = list(doc.iterate_items())
+    assert [xpath for xpath, _, _, _ in items] == [
+        "/doclang[1]/list[1]/ldiv[1]",
+        "/doclang[1]/list[1]/ldiv[2]",
+        "/doclang[1]/page_break[1]",
+        "/doclang[1]/list[2]/ldiv[1]",
+        "/doclang[1]/list[2]/ldiv[2]",
+    ]
+    assert [item["text"] for _, item, _, _ in items if item["name"] == "list_item"] == [
+        "First & more",
+        "Second",
+        "Nested one",
+        "Nested two",
+    ]
+    assert [entry[2:] for entry in items] == [
+        (1, [10, 20, 30, 40]),
+        (1, [50, 60, 70, 80]),
+        (None, None),
+        (2, [90, 100, 110, 120]),
+        (2, None),
+    ]
+    for _, item, _, _ in items:
+        if item["name"] == "list_item":
+            assert ElementTree.fromstring(item["xml"]).tag == "list_item"
+
+    assert list(doc.iterate_items(xpath="/doclang[1]/list[1]")) == items[:2]
+    assert list(doc.iterate_items(xpath="/doclang[1]/list[2]")) == items[3:]
+    assert list(doc.iterate_items_on_page(1)) == items[:2]
+    assert list(doc.iterate_items_on_page(2)) == items[3:]
+    assert [item["name"] for item in doc] == ["list", "page_break", "list"]
 
 
 def test_doclangx_document_read_xml_drops_previous_dclx_state(tmp_path):
@@ -301,8 +428,8 @@ def test_doclangx_document_read_xml_drops_previous_dclx_state(tmp_path):
     assert doc.valid()
     assert not doc.has_archive()
     assert not doc.has_annotations()
-    assert doc.summary()["properties"] == 0
-    assert doc.summary()["instances"] == 0
+    assert doc.overview()["properties"] == 0
+    assert doc.overview()["instances"] == 0
 
 
 def test_doclangx_document_at_resolves_doclang_paths():
@@ -352,8 +479,8 @@ def test_doclangx_nlp_reuses_initialised_models_across_documents():
 
     assert nlp.apply(first, progress_every=0)
     assert nlp.apply(second, progress_every=0)
-    assert first.summary()["instances"] == 0
-    assert second.summary()["instances"] == 0
+    assert first.overview()["instances"] == 0
+    assert second.overview()["instances"] == 0
 
 
 def test_doclangx_nlp_reports_uninitialised_apply():

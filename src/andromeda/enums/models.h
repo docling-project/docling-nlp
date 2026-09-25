@@ -193,6 +193,11 @@ namespace andromeda
       {
 	return CUSTOM_FST;
       }
+
+    if(uname.starts_with(to_string(SEMANTIC)+"("))
+      {
+	return SEMANTIC;
+      }
     
     for(auto mname:MODEL_NAMES)
       {
