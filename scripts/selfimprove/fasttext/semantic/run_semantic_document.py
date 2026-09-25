@@ -58,7 +58,7 @@ def read_dclx_text_items(path: Path) -> list[tuple[str, str]]:
         )
 
     items = []
-    for xpath, item in document.iterate_items():
+    for xpath, item, _, _ in document.iterate_items():
         if item["name"] in ["picture", "table"]:
             continue
         item_text = text(item["text"])

@@ -664,7 +664,7 @@ def dclx_text_items(path: Path) -> list[tuple[str, int | None, str | None]]:
     if root.get("selfimprove-schema") != "2":
         raise ValueError(f"legacy flattened DCLX cache: {path}")
     items = []
-    for _, item in dclx.iterate_items():
+    for _, item, _, _ in dclx.iterate_items():
         if item["name"] != "text":
             continue
         try:

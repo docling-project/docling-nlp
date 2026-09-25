@@ -1,4 +1,5 @@
 import zipfile
+from xml.etree import ElementTree
 
 import pandas as pd
 import pytest
@@ -265,13 +266,68 @@ def test_doclang_document_iterates_dclg_elements():
 
     assert doc.valid()
     assert doc.xml().startswith("<doclang")
-    assert [element["name"] for element in doc] == ["heading", "text"]
-    assert doc.elements(name="heading")[0]["text"] == "Title"
-    assert "<text>Body</text>" in doc.elements(name="text")[0]["xml"]
+    iterator = iter(doc)
+    assert iter(iterator) is iterator
+    assert next(iterator)["text"] == "Title"
+    assert "<text>Body</text>" in next(iterator)["xml"]
+    with pytest.raises(StopIteration):
+        next(iterator)
+    assert not hasattr(doc, "elements")
 
     invalid = DoclangDocument()
     assert not invalid.read_xml("<text>missing root</text>")
     assert "root <doclang>" in invalid.last_error()
+
+
+@pytest.mark.parametrize("document_type", [DoclangDocument, DocLangXDocument])
+def test_doclang_document_bounding_box_and_page_number(document_type):
+    doc = document_type()
+    assert doc.read_xml(
+        '<doclang version="0.7">'
+        '<text><location value="10"/><location value="20.5"/>'
+        '<location value="30"/><location value="40"/>First</text>'
+        '<page_break/>'
+        '<table><cell><location value="0"/><location value="100"/>'
+        '<location value="500"/><location value="1000"/>Second</cell></table>'
+        '<text>Unlocated</text>'
+        '</doclang>'
+    )
+
+    first = "/doclang[1]/text[1]"
+    second = "/doclang[1]/table[1]/cell[1]"
+    assert doc.bounding_box(first) == ((10.0, 20.5), (30.0, 40.0))
+    assert doc.page_number(first) == 1
+    assert doc.bounding_box(second) == ((0.0, 100.0), (500.0, 1000.0))
+    assert doc.page_number(second) == 2
+    assert doc.page_number("/doclang[1]/text[2]") == 2
+    assert doc.bounding_box("/doclang[1]/text[2]") is None
+    assert doc.bounding_box("/doclang[1]/missing[1]") is None
+    assert "not found" in doc.last_error()
+    assert doc.page_number("/doclang[1]/missing[1]") is None
+
+    items = list(doc.iterate_items())
+    assert [xpath for xpath, _, _, _ in items] == [
+        "/doclang[1]/text[1]",
+        "/doclang[1]/page_break[1]",
+        "/doclang[1]/table[1]",
+        "/doclang[1]/text[2]",
+    ]
+    assert items[0][2:] == (1, [10, 21, 30, 40])
+    assert items[1][2:] == (None, None)
+    assert items[2][2:] == (2, None)
+    assert items[3][2:] == (2, None)
+
+    children = list(doc.iterate_items(xpath="/doclang[1]/table[1]"))
+    assert len(children) == 1
+    assert children[0][0] == "/doclang[1]/table[1]/cell[1]"
+    assert children[0][2:] == (2, [0, 100, 500, 1000])
+    assert list(doc.iterate_items_on_page(1)) == items[:1]
+    assert list(doc.iterate_items_on_page(2)) == items[2:]
+    assert list(doc.iterate_items_on_page(3)) == []
+    with pytest.raises(ValueError, match="not found"):
+        doc.iterate_items(xpath="/doclang[1]/missing[1]")
+    with pytest.raises(ValueError, match="at least 1"):
+        doc.iterate_items_on_page(0)
 
 
 def test_doclangx_document_is_a_doclang_document():
@@ -284,12 +340,75 @@ def test_doclangx_document_is_a_doclang_document():
     assert doc.valid()
     assert doc.xml().startswith("<doclang")
     assert [element["name"] for element in doc] == ["heading", "text"]
-    assert doc.elements(name="heading")[0]["text"] == "Title"
-    assert [xpath for xpath, _ in doc.iterate_items()] == [
-        "/doclang[1]/heading[1]",
-        "/doclang[1]/text[1]",
+    items = doc.iterate_items()
+    assert iter(items) is items
+    assert next(items)[0] == "/doclang[1]/heading[1]"
+    xpath, item, page_no, bbox = next(items)
+    assert xpath == "/doclang[1]/text[1]"
+    assert item["text"] == "Body"
+    assert page_no == 1
+    assert bbox is None
+    with pytest.raises(StopIteration):
+        next(items)
+
+
+def test_doclang_iterator_keeps_document_alive():
+    doc = DoclangDocument('<doclang><text>One</text><text>Two</text></doclang>')
+    items = doc.iterate_items()
+    del doc
+
+    assert [(xpath, item["text"]) for xpath, item, _, _ in items] == [
+        ("/doclang[1]/text[1]", "One"),
+        ("/doclang[1]/text[2]", "Two"),
     ]
-    assert doc.iterate_items()[1][1]["text"] == "Body"
+
+
+@pytest.mark.parametrize("document_type", [DoclangDocument, DocLangXDocument])
+def test_doclang_iterate_items_expands_flat_and_nested_lists(document_type):
+    doc = document_type()
+    assert doc.read_xml(
+        '<doclang version="0.7">'
+        '<list><ldiv><marker>•</marker></ldiv>'
+        '<location value="10"/><location value="20"/>'
+        '<location value="30"/><location value="40"/>First &amp; more'
+        '<ldiv><marker>•</marker></ldiv>'
+        '<location value="50"/><location value="60"/>'
+        '<location value="70"/><location value="80"/>Second</list>'
+        '<page_break/>'
+        '<list><ldiv><marker>a.</marker>'
+        '<location value="90"/><location value="100"/>'
+        '<location value="110"/><location value="120"/>Nested one</ldiv>'
+        '<ldiv><marker>b.</marker>Nested two</ldiv></list>'
+        '</doclang>'
+    )
+
+    items = list(doc.iterate_items())
+    assert [xpath for xpath, _, _, _ in items] == [
+        "/doclang[1]/list[1]/ldiv[1]",
+        "/doclang[1]/list[1]/ldiv[2]",
+        "/doclang[1]/page_break[1]",
+        "/doclang[1]/list[2]/ldiv[1]",
+        "/doclang[1]/list[2]/ldiv[2]",
+    ]
+    assert [item["text"] for _, item, _, _ in items if item["name"] == "list_item"] == [
+        "First & more", "Second", "Nested one", "Nested two"
+    ]
+    assert [entry[2:] for entry in items] == [
+        (1, [10, 20, 30, 40]),
+        (1, [50, 60, 70, 80]),
+        (None, None),
+        (2, [90, 100, 110, 120]),
+        (2, None),
+    ]
+    for _, item, _, _ in items:
+        if item["name"] == "list_item":
+            assert ElementTree.fromstring(item["xml"]).tag == "list_item"
+
+    assert list(doc.iterate_items(xpath="/doclang[1]/list[1]")) == items[:2]
+    assert list(doc.iterate_items(xpath="/doclang[1]/list[2]")) == items[3:]
+    assert list(doc.iterate_items_on_page(1)) == items[:2]
+    assert list(doc.iterate_items_on_page(2)) == items[3:]
+    assert [item["name"] for item in doc] == ["list", "page_break", "list"]
 
 
 def test_doclangx_document_read_xml_drops_previous_dclx_state(tmp_path):

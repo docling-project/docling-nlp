@@ -798,7 +798,7 @@ wheels = [
 
 [[package]]
 name = "docling-core"
-version = "2.95.0"
+version = "2.96.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "defusedxml" },
@@ -811,13 +811,14 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
+    { name = "requests" },
     { name = "tabulate" },
     { name = "typer" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2d/b5/217831e148140fa70326742e9f820813592e3c932bda1f55ac2c76d3958c/docling_core-2.95.0.tar.gz", hash = "sha256:dd79a3db6d08a6d5f674fa66987aaf5c0f2705233cb329c2f19cd9472518796d", size = 371729, upload-time = "2026-09-04T15:17:44.315Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/28/772135dd81a6e0d1a3ef8ebf28896a2e342d637e2374b8dced00a34369e0/docling_core-2.96.1.tar.gz", hash = "sha256:1d33be46d1a284585df0b8f57f5cd815d85126b5a81c3310e84238b6c8889ce7", size = 377852, upload-time = "2026-09-15T07:32:57.824Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/09/72/9c62033a528be2ae276001faa3cfd01593a710d020b81eeb53d0b689d176/docling_core-2.95.0-py3-none-any.whl", hash = "sha256:bdaace4c575512f3dba36c2978fc3bf67f7fbedc2e8b3c3660b03bdab044fde8", size = 300013, upload-time = "2026-09-04T15:17:42.682Z" },
+    { url = "https://files.pythonhosted.org/packages/be/f0/ee691277477dbbf3e25a046a97a96bee1ea7cdddf0f4b9cb8cf0770a19dd/docling_core-2.96.1-py3-none-any.whl", hash = "sha256:17ed0c525a0c364ed6ff6cab09e817fcff5142dca9c113ed0f61b4f23a278852", size = 302945, upload-time = "2026-09-15T07:32:55.996Z" },
 ]
 
 [package.optional-dependencies]
@@ -935,7 +936,7 @@ requires-dist = [
     { name = "docling", marker = "extra == 'all'", specifier = ">=2.126.0,<3.0.0" },
     { name = "docling", marker = "extra == 'docling'", specifier = ">=2.126.0,<3.0.0" },
     { name = "docling-core", specifier = ">=2.0,<3.0" },
-    { name = "docling-core", marker = "extra == 'all'", specifier = ">=2.0,<3.0" },
+    { name = "docling-core", marker = "extra == 'all'", specifier = ">=2.96.1,<3.0" },
     { name = "docling-core", marker = "extra == 'docling'", specifier = ">=2.0,<3.0" },
     { name = "huggingface-hub", specifier = ">=1.28.0,<2.0.0" },
     { name = "huggingface-hub", marker = "extra == 'all'", specifier = ">=1.28.0,<2.0.0" },

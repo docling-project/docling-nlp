@@ -438,10 +438,18 @@ print(doc.at(xpath="/doclang[1]/text[1]"))
 | `valid()` / `last_error()` | Parse status and failure message |
 | `xml()` | The raw DocLang XML the document was parsed from |
 | `at(xpath=..., mode="auto")` | Read a DocLang path as text or XML |
-| `elements(name="")` / `__iter__` | Iterate direct children of `<doclang>` |
+| `__iter__` | Yield direct children of `<doclang>` one at a time |
+| `iterate_items(xpath=None)` | Yield direct children as `(xpath, item, page_no, bbox)` |
+| `iterate_items_on_page(page_no)` | Yield root items on a 1-based page |
 
-Iteration yields dictionaries with `name`, `xml`, and `text` keys. `at()`
-requires keyword arguments.
+Iteration yields dictionaries with `name`, `xml`, and `text` keys. Use `xml()`
+to get the full document for Python-side parsing. `at()` requires keyword
+arguments. In `iterate_items()` results, `page_no` is `None` for a page break
+and `bbox` is either `None` or four rounded integers in the 0–1000 coordinate
+space. A supplied `xpath` limits iteration to that node's direct children.
+Lists are expanded into one logical `list_item` per `<ldiv>` delimiter; each
+item has an XPath ending in `/ldiv[n]` and a well-formed `<list_item>` XML
+fragment. Plain `for element in doc` still yields direct root children.
 
 ### `DocLangXDocument` — the archive layer
 

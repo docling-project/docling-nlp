@@ -4,9 +4,19 @@
 #include <pybind11/stl.h>
 #include <pybind/utils/pybind11_json.h>
 
-#include <pybind/doclang.h>
+#include <pybind/doclang/doclang_document.h>
+#include <pybind/doclang/doclang_x_document.h>
+#include <pybind/doclang/doclang_x_nlp.h>
 
 PYBIND11_MODULE(andromeda_doclang, m) {
+
+  pybind11::class_<andromeda_py::DoclangDocument::Iterator>(m, "_DoclangIterator")
+    .def("__iter__", [](andromeda_py::DoclangDocument::Iterator& iterator)
+         -> andromeda_py::DoclangDocument::Iterator&
+         {
+           return iterator;
+         }, pybind11::return_value_policy::reference_internal)
+    .def("__next__", &andromeda_py::DoclangDocument::Iterator::next);
 
   pybind11::class_<andromeda_py::DoclangDocument>(m, "DoclangDocument")
     .def(pybind11::init())
@@ -20,13 +30,16 @@ PYBIND11_MODULE(andromeda_doclang, m) {
          pybind11::kw_only(),
          pybind11::arg("xpath"),
          pybind11::arg("mode") = "auto")
-    .def("elements", &andromeda_py::DoclangDocument::elements,
-         pybind11::arg("name") = "")
-    .def("iterate_items", &andromeda_py::DoclangDocument::iterate_items)
-    .def("__iter__", [](const andromeda_py::DoclangDocument& doc)
-         {
-           return doc.elements().attr("__iter__")();
-         });
+    .def("bounding_box", &andromeda_py::DoclangDocument::bounding_box,
+         pybind11::arg("xpath"))
+    .def("page_number", &andromeda_py::DoclangDocument::page_number,
+         pybind11::arg("xpath"))
+    .def("iterate_items", &andromeda_py::DoclangDocument::iterate_items,
+         pybind11::arg("xpath") = pybind11::none())
+    .def("iterate_items_on_page",
+         &andromeda_py::DoclangDocument::iterate_items_on_page,
+         pybind11::arg("page_no"))
+    .def("__iter__", &andromeda_py::DoclangDocument::iter);
 
   pybind11::class_<andromeda_py::DocLangXDocument,
                    andromeda_py::DoclangDocument>(m, "DocLangXDocument")

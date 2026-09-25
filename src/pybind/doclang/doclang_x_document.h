@@ -1,48 +1,26 @@
 //-*-C++-*-
 
-#ifndef PYBIND_ANDROMEDA_DOCLANG_H_
-#define PYBIND_ANDROMEDA_DOCLANG_H_
+#ifndef PYBIND_ANDROMEDA_DOCLANG_X_DOCUMENT_H_
+#define PYBIND_ANDROMEDA_DOCLANG_X_DOCUMENT_H_
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
-#include <map>
 #include <memory>
 #include <optional>
-#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <pybind11/pybind11.h>
 
 #include <andromeda.h>
 #include <pybind/utils/pybind11_json.h>
+#include <pybind/doclang/doclang_document.h>
+#include <pybind/doclang/doclang_x_nlp.h>
 
 namespace andromeda_py
 {
-
-  class DoclangDocument
-  {
-  public:
-
-    DoclangDocument();
-    explicit DoclangDocument(const std::string& dclg);
-    explicit DoclangDocument(std::shared_ptr<andromeda::doclang::dclg_document> value);
-
-    virtual ~DoclangDocument();
-
-    virtual bool read_xml(const std::string& dclg);
-
-    bool valid() const;
-    std::string xml() const;
-    std::string last_error() const;
-    std::string at(const std::string& xpath, const std::string& mode="auto");
-    pybind11::list elements(const std::string& name="") const;
-    pybind11::list iterate_items() const;
-
-  private:
-
-    std::shared_ptr<andromeda::doclang::dclg_document> dclg_doc;
-  };
 
   class DocLangXDocument: public DoclangDocument
   {
@@ -142,109 +120,13 @@ namespace andromeda_py
     std::shared_ptr<andromeda::doclang::dclx_document> doc;
   };
 
-  class DocLangXNlp
+  namespace detail
   {
-  public:
-
-    DocLangXNlp();
-    explicit DocLangXNlp(const std::string& models);
-    ~DocLangXNlp();
-
-    bool initialise(const std::string& models);
-    bool apply(DocLangXDocument& doc, std::size_t progress_every=25);
-
-    bool initialised() const;
-    std::string model_expr() const;
-    std::string last_error() const;
-    std::vector<std::string> models() const;
-
-  private:
-
-    bool is_initialised;
-    std::string model_expr_value;
-    std::string last_error_value;
-    std::vector<std::shared_ptr<andromeda::base_nlp_model> > nlp_models;
-  };
-
-  inline DoclangDocument::DoclangDocument():
-    dclg_doc(std::make_shared<andromeda::doclang::dclg_document>())
-  {}
-
-  inline DoclangDocument::DoclangDocument(const std::string& dclg):
-    DoclangDocument()
-  {
-    read_xml(dclg);
-  }
-
-  inline DoclangDocument::DoclangDocument(
-    std::shared_ptr<andromeda::doclang::dclg_document> value):
-    dclg_doc(std::move(value))
-  {}
-
-  inline DoclangDocument::~DoclangDocument()
-  {}
-
-  inline bool DoclangDocument::read_xml(const std::string& dclg)
-  {
-    return andromeda::doclang::reader::read_dclg_buffer(dclg, *dclg_doc);
-  }
-
-  inline bool DoclangDocument::valid() const
-  {
-    return dclg_doc->valid();
-  }
-
-  inline std::string DoclangDocument::xml() const
-  {
-    return dclg_doc->raw();
-  }
-
-  inline std::string DoclangDocument::last_error() const
-  {
-    return dclg_doc->get_last_error();
-  }
-
-  inline std::string DoclangDocument::at(const std::string& xpath,
-                                         const std::string& mode)
-  {
-    return dclg_doc->at(xpath, mode);
-  }
-
-  inline pybind11::list DoclangDocument::elements(const std::string& name) const
-  {
-    pybind11::list result;
-    dclg_doc->iterate_elements([&](pugi::xml_node node)
+    inline andromeda::doclang::dclx_document& mutable_doclang_x_document(
+      DocLangXDocument& document)
     {
-      if(not name.empty() and name!=node.name())
-        {
-          return;
-        }
-
-      pybind11::dict element;
-      element["name"] = node.name();
-      element["xml"] = andromeda::doclang::serialize_node(node);
-      element["text"] = andromeda::doclang::node_text_content(*dclg_doc, node);
-      result.append(element);
-    });
-    return result;
-  }
-
-  inline pybind11::list DoclangDocument::iterate_items() const
-  {
-    pybind11::list result;
-    std::map<std::string, std::size_t> positions;
-    dclg_doc->iterate_elements([&](pugi::xml_node node)
-    {
-      const std::string name = node.name();
-      const std::string xpath = "/doclang[1]/" + name + "[" +
-        std::to_string(++positions[name]) + "]";
-      pybind11::dict item;
-      item["name"] = name;
-      item["xml"] = andromeda::doclang::serialize_node(node);
-      item["text"] = andromeda::doclang::node_text_content(*dclg_doc, node);
-      result.append(pybind11::make_tuple(xpath, item));
-    });
-    return result;
+      return document.mutable_document();
+    }
   }
 
   inline DocLangXDocument::DocLangXDocument():
@@ -304,87 +186,6 @@ namespace andromeda_py
   inline andromeda::doclang::dclx_document& DocLangXDocument::mutable_document()
   {
     return *doc;
-  }
-
-  inline DocLangXNlp::DocLangXNlp():
-    is_initialised(false),
-    model_expr_value(""),
-    last_error_value(""),
-    nlp_models({})
-  {}
-
-  inline DocLangXNlp::DocLangXNlp(const std::string& models):
-    DocLangXNlp()
-  {
-    initialise(models);
-  }
-
-  inline DocLangXNlp::~DocLangXNlp()
-  {}
-
-  inline bool DocLangXNlp::initialise(const std::string& models)
-  {
-    nlp_models.clear();
-    model_expr_value = "";
-    last_error_value = "";
-    is_initialised = false;
-
-    if(not andromeda::to_models(models, nlp_models, true))
-      {
-        last_error_value = "could not initialise models: " + models;
-        return false;
-      }
-
-    model_expr_value = models;
-    is_initialised = true;
-    return true;
-  }
-
-  inline bool DocLangXNlp::apply(DocLangXDocument& document,
-                                 std::size_t progress_every)
-  {
-    if(not is_initialised)
-      {
-        last_error_value = "models have not been initialised";
-        document.mutable_document().set_last_error(last_error_value);
-        return false;
-      }
-
-    andromeda::doclang::nlp_apply_options options;
-    options.document_name = document.mutable_document().get_source_path().string();
-    options.progress_every = progress_every;
-
-    andromeda::doclang::nlp_apply_result result;
-    return andromeda::doclang::apply_models(document.mutable_document(),
-                                            nlp_models,
-                                            options,
-                                            result);
-  }
-
-  inline bool DocLangXNlp::initialised() const
-  {
-    return is_initialised;
-  }
-
-  inline std::string DocLangXNlp::model_expr() const
-  {
-    return model_expr_value;
-  }
-
-  inline std::string DocLangXNlp::last_error() const
-  {
-    return last_error_value;
-  }
-
-  inline std::vector<std::string> DocLangXNlp::models() const
-  {
-    std::vector<std::string> names;
-    for(const auto& model:nlp_models)
-      {
-        names.push_back(model->get_key());
-      }
-
-    return names;
   }
 
   inline bool DocLangXDocument::has_archive() const
